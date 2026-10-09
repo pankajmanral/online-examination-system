@@ -120,3 +120,5 @@ jobs:
           kubectl -n exam-system rollout restart deployment/result-service
           kubectl -n exam-system rollout restart deployment/gateway
           kubectl -n exam-system rollout status deployment/gateway --timeout=120s
+
+          
