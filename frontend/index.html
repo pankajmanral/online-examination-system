@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ExamForge — Online Examination System</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">E</span>
+      <div>
+        <strong>ExamForge</strong>
+        <small>Online Examination System</small>
+      </div>
+    </div>
+    <div id="user-bar" class="hidden">
+      <span class="user-chip"><span id="user-info"></span></span>
+      <button id="logout-btn" class="btn btn-ghost">Logout</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- AUTH -->
+    <section id="view-auth" class="auth-layout">
+      <aside class="auth-hero">
+        <h1>Examinations,<br />simplified.</h1>
+        <p>A microservices platform with JWT security, role-based access, auto-grading and live results.</p>
+        <ul class="feature-list">
+          <li>Secure JWT authentication</li>
+          <li>Timed exams with server-side validation</li>
+          <li>Instant automatic results</li>
+          <li>Admin &amp; student dashboards</li>
+        </ul>
+      </aside>
+      <div class="auth-panel card">
+        <div class="tabs">
+          <button class="tab active" data-auth-tab="login">Sign in</button>
+          <button class="tab" data-auth-tab="register">Register</button>
+        </div>
+        <form id="login-form">
+          <label>Email
+            <input type="email" id="login-email" required placeholder="admin@example.com" autocomplete="username" />
+          </label>
+          <label>Password
+            <input type="password" id="login-password" required placeholder="Admin@123" autocomplete="current-password" />
+          </label>
+          <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+        </form>
+        <form id="register-form" class="hidden">
+          <label>Full name
+            <input type="text" id="reg-name" required placeholder="Jane Doe" />
+          </label>
+          <label>Email
+            <input type="email" id="reg-email" required placeholder="jane@example.com" />
+          </label>
+          <label>Password
+            <input type="password" id="reg-password" required minlength="6" placeholder="At least 6 characters" />
+          </label>
+          <button class="btn btn-primary btn-block" type="submit">Create student account</button>
+        </form>
+        <p class="hint">Demo — Admin: <code>admin@example.com</code> / <code>Admin@123</code> · Student: <code>student@example.com</code> / <code>Student@123</code></p>
+      </div>
+    </section>
+
+    <!-- STUDENT -->
+    <section id="view-student" class="hidden">
+      <div class="card">
+        <div class="card-head">
+          <h2>My Examinations</h2>
+          <button class="btn btn-secondary" id="student-refresh">Refresh</button>
+        </div>
+        <table id="student-exams-table">
+          <thead><tr><th>Title</th><th>Subject</th><th>Questions</th><th>Duration</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="empty-note hidden" id="student-exams-empty">No exams available yet. Check back later.</p>
+      </div>
+
+      <div class="card hidden" id="exam-taking-card">
+        <div class="exam-topbar">
+          <div>
+            <h2 id="exam-taking-title"></h2>
+            <div class="progress-wrap">
+              <div class="progress-track"><div class="progress-fill" id="answered-progress"></div></div>
+              <span class="progress-label"><span id="answered-count">0</span> / <span id="total-count">0</span> answered</span>
+            </div>
+          </div>
+          <div class="exam-topbar-right">
+            <span class="timer-pill" id="exam-timer">--:--</span>
+            <button class="btn btn-primary" id="submit-exam-btn">Submit exam</button>
+          </div>
+        </div>
+        <div class="exam-navigator" id="exam-navigator"></div>
+        <div id="exam-questions"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>My Results</h2>
+          <button class="btn btn-secondary" id="results-refresh">Refresh</button>
+        </div>
+        <table id="results-table">
+          <thead><tr><th>Exam</th><th>Score</th><th>Total</th><th>Result</th><th>Date</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <p class="empty-note hidden" id="results-empty">No results yet — take an exam to see your score here.</p>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="view-admin" class="hidden">
+      <div class="stats-row">
+        <div class="stat-card"><span class="stat-value" id="stat-students">–</span><span class="stat-label">Students</span></div>
+        <div class="stat-card"><span class="stat-value" id="stat-questions">–</span><span class="stat-label">Questions</span></div>
+        <div class="stat-card"><span class="stat-value" id="stat-exams">–</span><span class="stat-label">Exams</span></div>
+        <div class="stat-card"><span class="stat-value" id="stat-results">–</span><span class="stat-label">Results</span></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Students</h2>
+          <button class="btn btn-secondary" id="students-refresh">Refresh</button>
+        </div>
+        <table id="students-table">
+          <thead><tr><th>Name</th><th>Email</th><th>Roll No</th><th>Course</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Question Bank</h2>
+          <button class="btn btn-secondary" id="questions-refresh">Refresh</button>
+        </div>
+        <form id="question-form" class="grid-form">
+          <label class="span-2">Question
+            <input type="text" id="q-text" required placeholder="e.g. What does CPU stand for?" />
+          </label>
+          <label>Option A<input type="text" id="q-opt0" required /></label>
+          <label>Option B<input type="text" id="q-opt1" required /></label>
+          <label>Option C<input type="text" id="q-opt2" placeholder="optional" /></label>
+          <label>Option D<input type="text" id="q-opt3" placeholder="optional" /></label>
+          <label>Correct option (0=A)<input type="number" id="q-correct" min="0" max="3" value="0" required /></label>
+          <label>Subject<input type="text" id="q-subject" value="General" /></label>
+          <label>Marks<input type="number" id="q-marks" min="1" value="1" /></label>
+          <button class="btn btn-primary span-2" type="submit">Add question</button>
+        </form>
+        <table id="questions-table">
+          <thead><tr><th>Question</th><th>Subject</th><th>Marks</th><th>Correct answer</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>Create Examination</h2>
+          <button class="btn btn-secondary" id="exams-refresh">Refresh</button>
+        </div>
+        <form id="exam-form" class="grid-form">
+          <label>Title<input type="text" id="e-title" required placeholder="e.g. Mid-Term Quiz" /></label>
+          <label>Subject<input type="text" id="e-subject" value="General" /></label>
+          <label>Duration (minutes)<input type="number" id="e-duration" min="1" value="30" /></label>
+          <div class="exam-qselect span-3">
+            <span class="sub-label">Select questions</span>
+            <div id="exam-question-picker" class="picker"></div>
+          </div>
+          <button class="btn btn-primary span-3" type="submit">Create exam</button>
+        </form>
+        <table id="admin-exams-table">
+          <thead><tr><th>Title</th><th>Subject</th><th>Questions</th><th>Duration</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>All Results</h2>
+          <button class="btn btn-secondary" id="admin-results-refresh">Refresh</button>
+        </div>
+        <table id="admin-results-table">
+          <thead><tr><th>Student</th><th>Exam</th><th>Score</th><th>Result</th><th>Date</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+</body>
+</html>

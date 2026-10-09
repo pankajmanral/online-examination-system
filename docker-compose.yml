@@ -1,0 +1,189 @@
+services:
+  mongo:
+    image: mongo:7
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    environment:
+      PORT: 3001
+      SERVICE_NAME: auth-service
+      MONGO_URI: mongodb://mongo:27017/exam_auth
+      JWT_SECRET: ${JWT_SECRET:-exam-dev-secret-change-me}
+      INTERNAL_KEY: ${INTERNAL_KEY:-exam-internal-key}
+      STUDENT_SERVICE_URL: http://student-service:3002
+      LOG_ENDPOINT: http://fluent-bit:8888
+    depends_on:
+      mongo: { condition: service_healthy }
+      student-service: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  student-service:
+    build:
+      context: .
+      dockerfile: services/student/Dockerfile
+    environment:
+      PORT: 3002
+      SERVICE_NAME: student-service
+      MONGO_URI: mongodb://mongo:27017/exam_students
+      JWT_SECRET: ${JWT_SECRET:-exam-dev-secret-change-me}
+      INTERNAL_KEY: ${INTERNAL_KEY:-exam-internal-key}
+      LOG_ENDPOINT: http://fluent-bit:8888
+    depends_on:
+      mongo: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  question-bank-service:
+    build:
+      context: .
+      dockerfile: services/question-bank/Dockerfile
+    environment:
+      PORT: 3003
+      SERVICE_NAME: question-bank-service
+      MONGO_URI: mongodb://mongo:27017/exam_questions
+      JWT_SECRET: ${JWT_SECRET:-exam-dev-secret-change-me}
+      INTERNAL_KEY: ${INTERNAL_KEY:-exam-internal-key}
+      LOG_ENDPOINT: http://fluent-bit:8888
+    depends_on:
+      mongo: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  examination-service:
+    build:
+      context: .
+      dockerfile: services/examination/Dockerfile
+    environment:
+      PORT: 3004
+      SERVICE_NAME: examination-service
+      MONGO_URI: mongodb://mongo:27017/exam_exams
+      JWT_SECRET: ${JWT_SECRET:-exam-dev-secret-change-me}
+      INTERNAL_KEY: ${INTERNAL_KEY:-exam-internal-key}
+      QUESTION_SERVICE_URL: http://question-bank-service:3003
+      RESULT_SERVICE_URL: http://result-service:3005
+      LOG_ENDPOINT: http://fluent-bit:8888
+    depends_on:
+      mongo: { condition: service_healthy }
+      question-bank-service: { condition: service_started }
+      result-service: { condition: service_started }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  result-service:
+    build:
+      context: .
+      dockerfile: services/result/Dockerfile
+    environment:
+      PORT: 3005
+      SERVICE_NAME: result-service
+      MONGO_URI: mongodb://mongo:27017/exam_results
+      JWT_SECRET: ${JWT_SECRET:-exam-dev-secret-change-me}
+      INTERNAL_KEY: ${INTERNAL_KEY:-exam-internal-key}
+      LOG_ENDPOINT: http://fluent-bit:8888
+    depends_on:
+      mongo: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: 8080
+      SERVICE_NAME: api-gateway
+      JWT_SECRET: ${JWT_SECRET:-exam-dev-secret-change-me}
+      AUTH_SERVICE_URL: http://auth-service:3001
+      STUDENT_SERVICE_URL: http://student-service:3002
+      QUESTION_SERVICE_URL: http://question-bank-service:3003
+      EXAMINATION_SERVICE_URL: http://examination-service:3004
+      RESULT_SERVICE_URL: http://result-service:3005
+      LOG_ENDPOINT: http://fluent-bit:8888
+    depends_on:
+      auth-service: { condition: service_healthy }
+      student-service: { condition: service_healthy }
+      question-bank-service: { condition: service_healthy }
+      examination-service: { condition: service_healthy }
+      result-service: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.0
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  fluent-bit:
+    image: fluent/fluent-bit:3.1
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./monitoring/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+    depends_on:
+      - elasticsearch
+
+volumes:
+  mongo-data:

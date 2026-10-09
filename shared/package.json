@@ -1,0 +1,9 @@
+{
+  "name": "exam-shared",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "jsonwebtoken": "^9.0.2",
+    "prom-client": "^15.1.3"
+  }
+}

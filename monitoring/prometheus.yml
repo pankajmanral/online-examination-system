@@ -1,0 +1,23 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: auth-service
+    static_configs:
+      - targets: ["auth-service:3001"]
+  - job_name: student-service
+    static_configs:
+      - targets: ["student-service:3002"]
+  - job_name: question-bank-service
+    static_configs:
+      - targets: ["question-bank-service:3003"]
+  - job_name: examination-service
+    static_configs:
+      - targets: ["examination-service:3004"]
+  - job_name: result-service
+    static_configs:
+      - targets: ["result-service:3005"]
+  - job_name: api-gateway
+    static_configs:
+      - targets: ["gateway:8080"]

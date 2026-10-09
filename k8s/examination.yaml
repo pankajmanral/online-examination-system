@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: examination-service
+  namespace: exam-system
+  labels:
+    app: examination-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: examination-service
+  template:
+    metadata:
+      labels:
+        app: examination-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3004"
+    spec:
+      containers:
+        - name: examination-service
+          image: ghcr.io/YOUR_GITHUB_USERNAME/exam-examination-service:latest
+          ports:
+            - containerPort: 3004
+          env:
+            - name: PORT
+              value: "3004"
+            - name: SERVICE_NAME
+              value: examination-service
+            - name: MONGO_URI
+              value: mongodb://mongo:27017/exam_exams
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: exam-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: exam-secrets
+                  key: INTERNAL_KEY
+            - name: QUESTION_SERVICE_URL
+              value: http://question-bank-service:3003
+            - name: RESULT_SERVICE_URL
+              value: http://result-service:3005
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3004
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3004
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: examination-service
+  namespace: exam-system
+  labels:
+    app: examination-service
+spec:
+  selector:
+    app: examination-service
+  ports:
+    - port: 3004
+      targetPort: 3004

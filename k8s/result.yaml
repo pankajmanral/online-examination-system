@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: result-service
+  namespace: exam-system
+  labels:
+    app: result-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: result-service
+  template:
+    metadata:
+      labels:
+        app: result-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3005"
+    spec:
+      containers:
+        - name: result-service
+          image: ghcr.io/YOUR_GITHUB_USERNAME/exam-result-service:latest
+          ports:
+            - containerPort: 3005
+          env:
+            - name: PORT
+              value: "3005"
+            - name: SERVICE_NAME
+              value: result-service
+            - name: MONGO_URI
+              value: mongodb://mongo:27017/exam_results
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: exam-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: exam-secrets
+                  key: INTERNAL_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3005
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3005
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: result-service
+  namespace: exam-system
+  labels:
+    app: result-service
+spec:
+  selector:
+    app: result-service
+  ports:
+    - port: 3005
+      targetPort: 3005

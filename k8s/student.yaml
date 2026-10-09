@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-service
+  namespace: exam-system
+  labels:
+    app: student-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: student-service
+  template:
+    metadata:
+      labels:
+        app: student-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3002"
+    spec:
+      containers:
+        - name: student-service
+          image: ghcr.io/YOUR_GITHUB_USERNAME/exam-student-service:latest
+          ports:
+            - containerPort: 3002
+          env:
+            - name: PORT
+              value: "3002"
+            - name: SERVICE_NAME
+              value: student-service
+            - name: MONGO_URI
+              value: mongodb://mongo:27017/exam_students
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: exam-secrets
+                  key: JWT_SECRET
+            - name: INTERNAL_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: exam-secrets
+                  key: INTERNAL_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-service
+  namespace: exam-system
+  labels:
+    app: student-service
+spec:
+  selector:
+    app: student-service
+  ports:
+    - port: 3002
+      targetPort: 3002

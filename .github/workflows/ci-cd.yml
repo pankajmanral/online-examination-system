@@ -1,0 +1,118 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: auth
+            dir: services/auth
+          - service: student
+            dir: services/student
+          - service: question-bank
+            dir: services/question-bank
+          - service: examination
+            dir: services/examination
+          - service: result
+            dir: services/result
+          - service: gateway
+            dir: gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - name: Install dependencies
+        working-directory: ${{ matrix.dir }}
+        run: npm install
+      - name: Syntax check
+        run: node --check ${{ matrix.dir }}/src/index.js
+      - name: Run tests
+        working-directory: ${{ matrix.dir }}
+        run: npm test
+
+  build-and-push:
+    name: Build & Push Docker images
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: exam-auth-service
+            dockerfile: services/auth/Dockerfile
+          - name: exam-student-service
+            dockerfile: services/student/Dockerfile
+          - name: exam-question-bank-service
+            dockerfile: services/question-bank/Dockerfile
+          - name: exam-examination-service
+            dockerfile: services/examination/Dockerfile
+          - name: exam-result-service
+            dockerfile: services/result/Dockerfile
+          - name: exam-gateway
+            dockerfile: gateway/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: |
+            type=sha,prefix=
+            latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+      - name: Configure kubeconfig
+        run: echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+      - name: Apply manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/secret.yaml
+          kubectl apply -f k8s/mongo.yaml
+          kubectl apply -f k8s/
+          kubectl apply -f k8s/monitoring/
+          kubectl apply -f k8s/logging/
+      - name: Rollout restart services
+        run: |
+          kubectl -n exam-system rollout restart deployment/auth-service
+          kubectl -n exam-system rollout restart deployment/student-service
+          kubectl -n exam-system rollout restart deployment/question-bank-service
+          kubectl -n exam-system rollout restart deployment/examination-service
+          kubectl -n exam-system rollout restart deployment/result-service
+          kubectl -n exam-system rollout restart deployment/gateway
+          kubectl -n exam-system rollout status deployment/gateway --timeout=120s

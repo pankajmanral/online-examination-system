@@ -1,0 +1,13 @@
+{
+    "name":  "online-examination-system",
+    "private":  true,
+    "workspaces":  [
+                       "shared",
+                       "services/*",
+                       "gateway"
+                   ],
+    "scripts":  {
+                    "test":  "npm test --workspaces --if-present",
+                    "start":  "npm start --workspaces --if-present"
+                }
+}
