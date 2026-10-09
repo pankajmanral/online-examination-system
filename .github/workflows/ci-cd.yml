@@ -92,6 +92,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Skips gracefully when no live cluster is configured.
+    # To enable real deploys: add a KUBE_CONFIG secret in repo Settings → Secrets,
+    # then remove continue-on-error below.
+    continue-on-error: true
     environment: production
     steps:
       - uses: actions/checkout@v4
