@@ -91,7 +91,10 @@ jobs:
     name: Deploy to Kubernetes
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Only runs when you connect a real cluster:
+    #   Settings → Secrets → add KUBE_CONFIG
+    #   Settings → Variables → add ENABLE_K8S_DEPLOY = true
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.ENABLE_K8S_DEPLOY == 'true'
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -116,3 +119,5 @@ jobs:
           kubectl -n exam-system rollout restart deployment/result-service
           kubectl -n exam-system rollout restart deployment/gateway
           kubectl -n exam-system rollout status deployment/gateway --timeout=120s
+
+          
